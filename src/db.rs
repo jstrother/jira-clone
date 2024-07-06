@@ -156,7 +156,7 @@ mod tests {
         let db = JiraDatabase {
             database: Box::new(MockDB::new()),
         };
-        let epic = Epic::new("".to_string(), "".to_string());
+        let epic = Epic::new("".to_owned(), "".to_owned());
         
         let result = db.create_epic(epic.clone());
 
