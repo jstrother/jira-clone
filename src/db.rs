@@ -148,8 +148,8 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::test_utils::MockDB;
+    use super::*;
 
     #[test]
     fn create_epic_should_work() {

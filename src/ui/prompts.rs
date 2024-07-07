@@ -5,7 +5,7 @@ pub struct Prompts {
     pub create_story: Box<dyn Fn() -> Story>,
     pub delete_epic: Box<dyn Fn() -> bool>,
     pub delete_story: Box<dyn Fn() -> bool>,
-    pub update_status: Box<dyn Fn() -> Status>,
+    pub update_status: Box<dyn Fn() -> Option<Status>>,
 }
 
 impl Prompts {
@@ -84,10 +84,18 @@ fn update_status_prompt() -> Option<Status> {
 
     if let Ok(status) = status {
         match status {
-            1 => return Some(Status::OPEN),
-            2 => return Some(Status::IN_PROGRESS),
-            3 => return Some(Status::RESOLVED),
-            4 => return Some(Status::CLOSED),
+            1 => {
+                return Some(Status::Open)
+            },
+            2 => {
+                return Some(Status::InProgress)
+            },
+            3 => {
+                return Some(Status::Resolved)
+            },
+            4 => {
+                return Some(Status::Closed)
+            },
             _ => return None,
         }
     }

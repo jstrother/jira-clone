@@ -24,7 +24,7 @@ impl Navigator {
     pub fn handle_action(&mut self, action: Action) -> Result<()> {
         match action {
             Action::NavigateToEpicDetail { epic_id } => {
-                self.pages.push(Box::new(EpicDetail { db: Rc::clone(&self.db) }));
+                self.pages.push(Box::new(EpicDetail { epic_id, db: Rc::clone(&self.db) }));
             }
             Action::NavigateToStoryDetail { epic_id, story_id } => {
                 self.pages.push(Box::new(StoryDetail { epic_id, story_id, db: Rc::clone(&self.db) }));
@@ -55,7 +55,7 @@ impl Navigator {
 
                 self.db.create_story(story, epic_id).with_context(|| anyhow!("Failed to create story"))?;
             }
-            Action::UPdateStoryStatus { story_id } => {
+            Action::UpdateStoryStatus { story_id } => {
                 let status = (self.prompts.update_status)();
 
                 if let Some(status) = status {
@@ -96,11 +96,11 @@ mod test {
     #[test]
     fn should_start_on_home_page() {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
-        let nav = Navigator::new(db);
+        let navigator = Navigator::new(db);
 
-        assert_eq!(nav.get_page_count(), 1);
+        assert_eq!(navigator.get_page_count(), 1);
 
-        let current_page = nav.get_current_page().unwrap();
+        let current_page = navigator.get_current_page().unwrap();
         let home_page = current_page.as_any().downcast_ref::<HomePage>();
 
         assert_eq!(home_page.is_some(), true);
@@ -110,68 +110,68 @@ mod test {
     fn handle_action_should_navigate_pages() {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-        let mut nav = Navigator::new(db);
+        let mut navigator = Navigator::new(db);
         
-        nav.handle_action(Action::NavigateToEpicDetail { epic_id: 1 }).unwrap();
-        assert_eq!(nav.get_page_count(), 2);
+        navigator.handle_action(Action::NavigateToEpicDetail { epic_id: 1 }).unwrap();
+        assert_eq!(navigator.get_page_count(), 2);
 
-        let current_page = nav.get_current_page().unwrap();
+        let current_page = navigator.get_current_page().unwrap();
         let epic_detail_page = current_page.as_any().downcast_ref::<EpicDetail>();
         assert_eq!(epic_detail_page.is_some(), true);
 
-        nav.handle_action(Action::NavigateToStoryDetail { epic_id: 1, story_id: 2 }).unwrap();
-        assert_eq!(nav.get_page_count(), 3);
+        navigator.handle_action(Action::NavigateToStoryDetail { epic_id: 1, story_id: 2 }).unwrap();
+        assert_eq!(navigator.get_page_count(), 3);
 
-        let current_page = nav.get_current_page().unwrap();
+        let current_page = navigator.get_current_page().unwrap();
         let story_detail_page = current_page.as_any().downcast_ref::<StoryDetail>();
         assert_eq!(story_detail_page.is_some(), true);
 
-        nav.handle_action(Action::NavigateToPreviousPage).unwrap();
-        assert_eq!(nav.get_page_count(), 2);
+        navigator.handle_action(Action::NavigateToPreviousPage).unwrap();
+        assert_eq!(navigator.get_page_count(), 2);
 
-        let current_page = nav.get_current_page().unwrap();
+        let current_page = navigator.get_current_page().unwrap();
         let epic_detail_page = current_page.as_any().downcast_ref::<EpicDetail>();
         assert_eq!(epic_detail_page.is_some(), true);
 
-        nav.handle_action(Action::NavigateToPreviousPage).unwrap();
-        assert_eq!(nav.get_page_count(), 1);
+        navigator.handle_action(Action::NavigateToPreviousPage).unwrap();
+        assert_eq!(navigator.get_page_count(), 1);
 
-        let current_page = nav.get_current_page().unwrap();
+        let current_page = navigator.get_current_page().unwrap();
         let home_page = current_page.as_any().downcast_ref::<HomePage>();
         assert_eq!(home_page.is_some(), true);
 
-        nav.handle_action(Action::NavigateToPreviousPage).unwrap();
-        assert_eq!(nav.get_page_count(), 0);
+        navigator.handle_action(Action::NavigateToPreviousPage).unwrap();
+        assert_eq!(navigator.get_page_count(), 0);
 
-        nav.handle_action(Action::NavigateToPreviousPage).unwrap();
-        assert_eq!(nav.get_page_count(), 0);
+        navigator.handle_action(Action::NavigateToPreviousPage).unwrap();
+        assert_eq!(navigator.get_page_count(), 0);
     }
 
     #[test]
     fn handle_action_should_clear_pages_on_exit() {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-        let mut nav = Navigator::new(db);
+        let mut navigator = Navigator::new(db);
         
-        nav.handle_action(Action::NavigateToEpicDetail { epic_id: 1 }).unwrap();
-        nav.handle_action(Action::NavigateToStoryDetail { epic_id: 1, story_id: 2 }).unwrap();
-        nav.handle_action(Action::Exit).unwrap();
+        navigator.handle_action(Action::NavigateToEpicDetail { epic_id: 1 }).unwrap();
+        navigator.handle_action(Action::NavigateToStoryDetail { epic_id: 1, story_id: 2 }).unwrap();
+        navigator.handle_action(Action::Exit).unwrap();
 
-        assert_eq!(nav.get_page_count(), 0);
+        assert_eq!(navigator.get_page_count(), 0);
     }
 
     #[test]
     fn handle_action_should_handle_create_epic() {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.create_epic = Box::new(|| Epic::new("name".to_owned(), "description".to_owned()));
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::CreateEpic).unwrap();
+        navigator.handle_action(Action::CreateEpic).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.epics.len(), 1);
@@ -186,14 +186,14 @@ mod test {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
         let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.update_status = Box::new(|| Some(Status::InProgress));
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::UpdateEpicStatus { epic_id }).unwrap();
+        navigator.handle_action(Action::UpdateEpicStatus { epic_id }).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.epics.get(&epic_id).unwrap().status, Status::InProgress);
@@ -204,14 +204,14 @@ mod test {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
         let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.delete_epic = Box::new(|| true);
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::DeleteEpic { epic_id }).unwrap();
+        navigator.handle_action(Action::DeleteEpic { epic_id }).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.epics.len(), 0);
@@ -222,14 +222,14 @@ mod test {
         let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
         let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.create_story = Box::new(|| Story::new("name".to_owned(), "description".to_owned()));
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::CreateStory { epic_id }).unwrap();
+        navigator.handle_action(Action::CreateStory { epic_id }).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.stories.len(), 1);
@@ -245,14 +245,14 @@ mod test {
         let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
         let story_id = db.create_story(Story::new("".to_owned(), "".to_owned()), epic_id).unwrap();
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.update_status = Box::new(|| Some(Status::InProgress));
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::UpdateStoryStatus { story_id }).unwrap();
+        navigator.handle_action(Action::UpdateStoryStatus { story_id }).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.stories.get(&story_id).unwrap().status, Status::InProgress);
@@ -264,14 +264,14 @@ mod test {
         let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
         let story_id = db.create_story(Story::new("".to_owned(), "".to_owned()), epic_id).unwrap();
 
-        let mut nav = Navigator::new(Rc::clone(&db));
+        let mut navigator = Navigator::new(Rc::clone(&db));
 
         let mut prompts = Prompts::new();
         prompts.delete_story = Box::new(|| true);
 
-        nav.set_prompts(prompts);
+        navigator.set_prompts(prompts);
         
-        nav.handle_action(Action::DeleteStory { epic_id, story_id }).unwrap();
+        navigator.handle_action(Action::DeleteStory { epic_id, story_id }).unwrap();
 
         let db_state = db.read_db().unwrap();
         assert_eq!(db_state.stories.len(), 0);
